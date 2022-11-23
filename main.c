@@ -10,25 +10,20 @@ unsigned char table[4] = {'0','1','2','3'};
 typedef struct 
 {
     unsigned char k_mer[32];
-    int Loction;
+    long Loction;
     /* data */
 }Yuanzu;
 //归并排序
-void printList(int arr[], int len) {
-	int i;
-	for (i = 0; i < len; i++) {
-		printf("%d\t", arr[i]);
-	}
-}
-void merge(int arr[], int start, int mid, int end, int length) {
-	int result[length];
+void merge(Yuanzu arr[], long start, long mid, long end, long length) {
+	Yuanzu result[length];
 	int k = 0;
-	int i = start;
-	int j = mid + 1;
+	long i = start;
+	long j = mid + 1;
 	while (i <= mid && j <= end) {
-		if (arr[i] < arr[j]){
+		if (strcmp(arr[i].k_mer, arr[j].k_mer)< 0)
+    {
 			result[k++] = arr[i++];
-        }
+    }
 		else{
 			result[k++] = arr[j++];
         }
@@ -46,12 +41,12 @@ void merge(int arr[], int start, int mid, int end, int length) {
 	}
 }
  
-void mergeSort(int arr[], int start, int end, int length) {
+void mergeSort(Yuanzu arr[], long start, long end, long length) {
 	if (start >= end)
 		return;
-	int mid = ( start + end ) / 2;
-	mergeSort(arr, start, mid, length);
-	mergeSort(arr, mid + 1, end, length);
+	long mid = ( start + end ) / 2;
+	mergeSort(arr, start, mid, mid+1);
+	mergeSort(arr, mid + 1, end, mid+1);
 	merge(arr, start, mid, end, length);
 }
 
@@ -93,25 +88,39 @@ int main(int argc, char *argv[])
     Yuanzu yuanzu[k_mers];
     long k_mers_1 = 0;//使用哈希函数后的剩余量
     int flag ; //k-mer哈希后是否留下
-    for(long i=0; i<= k_mers; i++){
-        for(int j=i; j<i+32; j++){
-             unsigned char test[32];
-             test[j] = seqs[j];
+    unsigned char test[32];
+    for(long i=0; i< k_mers; i++)
+    {
+        for(int j=i; j<i+32; j++)
+        {             
+            for (int j_1 =0 ; j_1 < 32 ; j_1++)
+            {
+                  test[j_1] = seqs[j];
+            }
+             
+        }
              int number=atoi(test);
              flag = 0 ;
-             if(number % 7 == 5 || number % 17 == 7 || number % 19 == 13 || number % 53 == 31 || number % 71 == 47 ){
-                for(int k=i; k<i+32; k++){
-                   yuanzu[i].k_mer[k] = seqs[k];
+             if(number % 7 == 5 || number % 17 == 7 || number % 19 == 13 || number % 53 == 31 || number % 71 == 47 )
+             {
+                for(int k=i; k<i+32; k++)
+                {
+                   for(int k_1 =0; k_1<32; k_1++)
+                   {
+                    yuanzu[k_mers_1].k_mer[k_1] = seqs[k];
+                   }
+                   
                 }
                 flag = 1 ;
              }  //哈希函数           
-        }
-        if(flag == 1){
-                yuanzu[i].Loction = i;
+              if(flag == 1)
+              {
+                yuanzu[k_mers_1].Loction = i;
                 k_mers_1++ ;
-        }
+              }
         
     }
+    mergeSort(yuanzu, 0, k_mers_1-1, k_mers_1);//排序基因组k-mer
     kseq_destroy(seq); // STEP 5: destroy seq
     gzclose(fp); // STEP 6: close the file handler
     return 0;
