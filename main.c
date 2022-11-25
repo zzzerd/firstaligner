@@ -13,10 +13,23 @@ typedef struct
     long Loction;
     /* data */
 }Yuanzu;
+typedef struct 
+{
+   unsigned char k_mer22[22];
+   long start;
+   long end;
+  /* data */
+}P_yuanzu;
+typedef struct 
+{
+    unsigned char k_mer10[10];
+    long Loction1;
+    /* data */
+}W_yuanzu;
 //归并排序
 void merge(Yuanzu arr[], long start, long mid, long end, long length) {
 	Yuanzu result[length];
-	int k = 0;
+	long k = 0;
 	long i = start;
 	long j = mid + 1;
 	while (i <= mid && j <= end) {
@@ -57,6 +70,17 @@ int main(int argc, char *argv[])
     long bases = 0;
     char *seqs;
     int l;
+    long k_mers = bases-32+1;
+    Yuanzu yuanzu[k_mers];
+    long k_mers_1 = 0;//使用哈希函数后的剩余量
+    int flag ; //k-mer哈希后是否留下
+    unsigned char test[32];
+    long i=0;
+    long chushi = 0;
+    long chushi2 = k_mers_1-1;
+    unsigned char test_22[22];
+    long p_k_mer = 0;//p数组k-mer数量
+    
     if (argc == 1) {
         fprintf(stderr, "Usage: %s <in.seq>\n", argv[0]);
         return 1;
@@ -69,7 +93,7 @@ int main(int argc, char *argv[])
         //printf("seq: %s\n", seq->seq.s);
         //if (seq->qual.l) printf("qual: %s\n", seq->qual.s);
         bases += strlen(seq->seq.s);
-        seqs[bases]=seq->seq.s;
+        seqs=seq->seq.s;
     }
    for(long bases_1=0; bases_1 < bases; bases_1++){
        if (seqs[bases_1] == 'A')
@@ -84,33 +108,27 @@ int main(int argc, char *argv[])
           srand((unsigned)time(0));
           seqs[bases_1] == table[rand()%4];
    }
-    long k_mers = bases-32+1;
-    Yuanzu yuanzu[k_mers];
-    long k_mers_1 = 0;//使用哈希函数后的剩余量
-    int flag ; //k-mer哈希后是否留下
-    unsigned char test[32];
-    for(long i=0; i< k_mers; i++)
+    
+    for( i=0; i< k_mers; i++)
     {
+        int j_1 =0 ;
         for(int j=i; j<i+32; j++)
-        {             
-            for (int j_1 =0 ; j_1 < 32 ; j_1++)
-            {
+        {                    
                   test[j_1] = seqs[j];
-            }
+                  j_1++;
              
         }
              int number=atoi(test);
              flag = 0 ;
              if(number % 7 == 5 || number % 17 == 7 || number % 19 == 13 || number % 53 == 31 || number % 71 == 47 )
              {
+                int k_1 =0;
                 for(int k=i; k<i+32; k++)
                 {
-                   for(int k_1 =0; k_1<32; k_1++)
-                   {
                     yuanzu[k_mers_1].k_mer[k_1] = seqs[k];
-                   }
-                   
+                    k_1++;
                 }
+                   
                 flag = 1 ;
              }  //哈希函数           
               if(flag == 1)
@@ -120,7 +138,40 @@ int main(int argc, char *argv[])
               }
         
     }
-    mergeSort(yuanzu, 0, k_mers_1-1, k_mers_1);//排序基因组k-mer
+  
+    mergeSort(yuanzu, chushi, chushi2, k_mers_1);//排序基因组k-mer
+    long w_loction=0;
+    P_yuanzu p_yuanzu[k_mers_1];
+    W_yuanzu w_yuanzu[k_mers_1];
+    while (w_loction<k_mers_1)
+    {
+      /* code */
+      int w_dingwei = 0 ; //用于w数组的k-mer
+      strncpy(p_yuanzu[p_k_mer].k_mer22, yuanzu[w_loction].k_mer, 22);
+      p_yuanzu[p_k_mer].start=w_loction;
+      for (int i_dingwei = 22; i_dingwei < 32; i_dingwei++)
+      {
+        /* code */
+        w_yuanzu[w_loction].k_mer10[w_dingwei] = yuanzu[w_loction].k_mer[i_dingwei];
+        w_dingwei++;
+      }
+      w_yuanzu[w_loction].Loction1 = yuanzu->Loction;
+      w_loction++;
+      for (; strcmp(p_yuanzu[p_k_mer].k_mer22, yuanzu[w_loction].k_mer)== 0; w_loction++)
+      {
+        /* code */
+        int w_dingwei2 = 0 ;
+        for (int i_dingwei = 22; i_dingwei < 32; i_dingwei++)
+        {
+        /* code */
+        w_yuanzu[w_loction].k_mer10[w_dingwei2] = yuanzu[w_loction].k_mer[i_dingwei];
+        w_dingwei2++;
+        }
+      }
+      p_yuanzu[p_k_mer].end = w_loction-1;
+      p_k_mer++;
+    }//p数组，w数组
+    
     kseq_destroy(seq); // STEP 5: destroy seq
     gzclose(fp); // STEP 6: close the file handler
     return 0;
