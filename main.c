@@ -7,6 +7,11 @@
 // STEP 1: declare the type of file handler and the read() function
 KSEQ_INIT(gzFile, gzread)
 unsigned char table[4] = {'0','1','2','3'};
+typedef struct
+{
+    unsigned char k_mer_read[22];
+    int loction_read;
+}Read_kmer;
 typedef struct 
 {
     unsigned char k_mer[32];
@@ -276,8 +281,10 @@ int main(int argc, char *argv[])
         else if (seqs[bases_1] == 'T')
           seqs[bases_1] == table[3];
         else 
-          srand((unsigned)time(0));
-          seqs[bases_1] == table[rand()%4];
+          {
+           srand((unsigned)time(0));
+           seqs[bases_1] == table[rand()%4];
+          }
    }
     
     for( i=0; i< k_mers; i++)
@@ -328,7 +335,7 @@ int main(int argc, char *argv[])
       }
       w_yuanzu[w_loction].Loction1 = yuanzu->Loction;
       w_loction++;
-      for (; strcmp(p_yuanzu[p_k_mer].k_mer22, yuanzu[w_loction].k_mer)== 0; w_loction++)
+      for (; memcmp(p_yuanzu[p_k_mer].k_mer22, yuanzu[w_loction].k_mer, sizeof(p_yuanzu[p_k_mer].k_mer22))== 0; w_loction++)
       {
         /* code */
         int w_dingwei2 = 0 ;
@@ -378,6 +385,108 @@ int main(int argc, char *argv[])
        if (seq->qual.l) printf("qual: %s\n", seq->qual.s); */
       char *read_name = seq_read->name;
       fprintf(fp_raed, "%s"+/t, read_name);
+      char seq_read_name[100] = seq_read->seq.s;
+      unsigned char seq_read_00 [100];
+      for (int seq_swich = 0; i < 100; i++)
+      {
+        /* code */
+         if (seq_read_name[seq_swich] == 'A')
+          seq_read_00[seq_swich] == table[0];
+        else if (seq_read_name[seq_swich] == 'C')
+          seq_read_00[seq_swich] == table[1];
+        else if (seq_read_name[seq_swich] == 'G')
+          seq_read_00[seq_swich] == table[2];
+        else if (seq_read_name[seq_swich] == 'T')
+          seq_read_00[seq_swich] == table[3];
+        else 
+          {
+           srand((unsigned)time(0));
+           seq_read_00[seq_swich] == table[rand()%4];
+          }
+      }
+      int k_mer_order = 0;
+      Read_kmer read_kmer[79];
+      int i_dingwei = 0;
+         while (i_dingwei<88)//不重叠的k_mer
+         {
+            /* code */
+            unsigned char test_read[22];
+            int flag_read = 0;
+            for(int j_dingwei=0; j_dingwei<22; j_dingwei++)
+            {
+                test_read[j_dingwei] = seq_read_00[i_dingwei];
+                i_dingwei++;
+            }
+            i_dingwei++;
+            if (k_mer_order == 0)
+            {
+                /* code */
+              strcpy(read_kmer[k_mer_order].k_mer_read, test_read); 
+              read_kmer[k_mer_order].loction_read = i_dingwei-22;
+              k_mer_order++;
+            }
+             for (int k = 0; k < k_mer_order; k++)
+             {
+                /* code */
+                if (strcmp(read_kmer[k].k_mer_read, test_read) == 0)
+                {
+                    /* code */
+                    flag_read = 1;
+                    break;
+
+                }
+                
+             }
+             if (flag_read == 0)
+             {
+                /* code */
+                strcpy(read_kmer[k_mer_order].k_mer_read, test_read);
+                read_kmer[k_mer_order].loction_read = i_dingwei-22;
+                k_mer_order++;
+             }
+             
+         }
+
+          for (int  kk = 1; kk < 79; kk++)//重叠k_mer
+          {
+            /* code */
+               int j_2 =0 ;
+               unsigned char test_read[22];
+               flag_read = 0;
+               for(int j=kk; j<kk+22; j++)
+               {                    
+                  test_read[j_2] = seq_read_00[kk] ;
+                  j_2++;
+               }
+             for (int k = 0; k < k_mer_order; k++)
+             {
+                /* code */
+                if (strcmp(read_kmer[k].k_mer_read, test_read) == 0)
+                {
+                    /* code */
+                    flag_read = 1;
+                    break;
+
+                }
+              }
+              if (flag_read == 0)
+             {
+                /* code */
+                strcpy(read_kmer[k_mer_order].k_mer_read, test_read);
+                read_kmer[k_mer_order].loction_read = kk;
+                k_mer_order++;
+             }
+          }
+          for (int p_dingwei = 0; p_dingwei < count; p_dingwei++)//在p数组中查找与k_mer相同的
+          {
+            /* code */
+
+          }
+          
+         
+      
+      
+
     }
     fclose(fp_sam);
     kseq_destroy(seq_read);
