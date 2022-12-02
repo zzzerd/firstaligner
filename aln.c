@@ -5,9 +5,116 @@
 #include <time.h>
 #include "klib/kseq.h"  
 #include "struct_ref_read.h"
+#define MAX_LOC 30
 KSEQ_INIT(gzFile, gzread)
+struct 
+{
+   /* data */
+   int min;
+   char cig_1[100];
+   int ref_loc;
+}Alg_read;
 
+struct 
+{
+  /* data */
+  int start;
+  int end;
 
+}Less_max;
+struct 
+{
+  /* data */
+  int start;
+  int end;
+
+}Over_max;
+int g(int l , int m)
+{
+   if(l > (m+2))
+    return 1 ;
+    else
+    return 0 ;
+}
+void rle()//游程编码
+{
+ int count = 0;
+ char samechar;
+ char temp = cig[0];
+ int loction = 0;
+ samechar = temp;
+ while (loction < 100)
+ {
+   /* code */
+   if (temp == samechar)
+   {
+      count++;
+      loction++;
+      temp = cig[loction];
+      continue;
+   }
+   else
+   {
+      ;
+      ;
+      samechar = temp;
+      count = 0;
+   }
+ }
+ 
+}
+Alg_read hanming( char *seq_read_00, char *seqs, Less_max *less_max, Over_max *over_max, int lessloction, int overloction, W_yuanzu *w_yuanzu)
+{
+   Alg_read alg;
+   alg.min = 0;
+   int l = 0;
+   alg.ref_loc=0;
+   for(int i =0; i<=lessloction; i++)
+   {
+    int start = less_max[i].start;
+    int end = less_max[i].end;
+    char cig[100];
+    int mismatch =0;
+    for( ; start <= end ;start++)
+    {
+       int alg_loc =w_yuanzu[start].Loction1;
+       for (int j = 0; j < 100; j++)
+       {
+         /* code */
+         if (seq_read_00[j]==seqs[alg_loc])
+         {
+            /* code */
+            cig[j]= "=";
+         }
+         else
+         {
+            cig[j]= "X";
+            mismatch++;
+         }
+         alg_loc++;
+       }
+       if (min > mismatch)
+       {
+         /* code */
+         min = mismatch;
+         memcpy(alg.cig_1,cig,sizeof(cig_1));
+         ref_loc = w_yuanzu[start].Loction1;
+       }
+       
+    }
+    l++;
+    if(g(l,min))
+      break;
+   }
+   if (min>50)
+   {
+      /* code */
+      //NW函数
+    return  ;
+   }
+   else
+    return alg;
+}
 void aligner (int argc, char *argv[], long p_k_mer, P_yuanzu *p_yuanzu, W_yuanzu *w_yuanzu, char *seqs)
 {
     FILE *fp_sam;
@@ -25,6 +132,7 @@ void aligner (int argc, char *argv[], long p_k_mer, P_yuanzu *p_yuanzu, W_yuanzu
     gzFile fp_raed;
     kseq_t *seq_read;
     int l_read;
+    int length;
     if (argc == 1) 
     {
     fprintf(stderr, "Usage: %s <in.fasta>\n", argv[0]);
@@ -42,7 +150,11 @@ void aligner (int argc, char *argv[], long p_k_mer, P_yuanzu *p_yuanzu, W_yuanzu
        if (seq->qual.l) printf("qual: %s\n", seq->qual.s); */
       fprintf(fp_sam, "%s\t", seq_read->name.s);
       char *seq_read_seq = seq_read->seq.s;
-      unsigned char seq_read_00 [100];
+      length = strlen(seq_read->seq.s);
+      char seq_read_00 [100];
+      Less_max *less_max;
+      Over_max *over_max;
+      char *cigar;
       for (int seq_swich = 0; seq_swich < 100; seq_swich++)
       {
         /* code */
@@ -131,17 +243,36 @@ void aligner (int argc, char *argv[], long p_k_mer, P_yuanzu *p_yuanzu, W_yuanzu
                 k_mer_order++;
              }
           }
+          less_max = (Less_max*)malloc(k_mer_order*sizeof(Less_max));
+          Over_max = (Over_max*)malloc(k_mer_order*sizeof(Over_max));
+          int lessloction = 0 ;
+          int overloction = 0 ;
           for(int kmer_dingwei = 0; kmer_dingwei<k_mer_order; kmer_dingwei++)
           {         
+             
              for (long p_dingwei = 0; p_dingwei < p_k_mer1; p_dingwei++)//在p数组中查找与k_mer相同的
             {
             /* code */
                       if(strcmp(read_kmer[kmer_dingwei].k_mer_read, p_yuanzu[p_dingwei].k_mer22) == 0)
                       {
-                         
+                         int read_loctions = p_yuanzu[p_dingwei].end - p_yuanzu[p_dingwei].start + 1;
+                         if (read_loctions<= MAX_LOC)
+                         {
+                            less_max[lessloction].start = p_yuanzu[p_dingwei].start;
+                            less_max[lessloction].end = p_yuanzu[p_dingwei].end;
+                            lessloction++;
+                         }
+                         else
+                         {
+                           over_max[overloction].start = p_yuanzu[p_dingwei].start;
+                           over_max[overloction].end = p_yuanzu[p_dingwei].end;
+                           overloction++;
+                         }
                       }
             }
+
           }
+
          
       
       
