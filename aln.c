@@ -6,8 +6,9 @@
 #include "klib/kseq.h"  
 #include "struct_ref_read.h"
 #define MAX_LOC 30
+#define GAP_CHAR '-'
 KSEQ_INIT(gzFile, gzread)
-struct 
+typedef struct 
 {
    /* data */
    int min;
@@ -15,20 +16,31 @@ struct
    int ref_loc;
 }Alg_read;
 
-struct 
+typedef struct 
 {
   /* data */
   int start;
   int end;
 
 }Less_max;
-struct 
+typedef struct 
 {
   /* data */
   int start;
   int end;
 
 }Over_max;
+struct Unit {
+    int W1;   // 是否往上回溯一格
+    int W2;   // 是否往左上回溯一格
+    int W3;   // 是否往左回溯一格
+    float X;
+    float Y;
+    float M;
+    float O;      // 得分矩阵第(i, j)这个单元的分值，即序列s(1,...,i)与序列r(1,...,j)比对的最高得分
+};
+typedef struct Unit *pUnit;
+
 int g(int l , int m)
 {
    if(l > (m+2))
@@ -63,18 +75,160 @@ void rle()//游程编码
  }
  
 }
+float max2(float a, float b) {
+    return a > b ? a : b;
+}
+float max3(float a, float b, float c) {
+    float f = a > b ? a : b;
+    return f > c ? f : c;
+}
+//match分值为5，mismatch分值为-4
+float getFScore(char a, char b) {
+    if(a == b)
+    return 5 ;
+    else
+    return -4;
+}
+void printAlign(pUnit** a, const int i, const int j, char* s, char* r, char* saln, char* raln, int n) {
+   // int k;
+    pUnit p = a[i][j];
+/*     if (! (i || j)) {   // 到矩阵单元(0, 0)才算结束，这代表初始的两个字符串的每个字符都被比对到了
+        for (k = n - 1; k >= 0; k--)
+            printf("%c", saln[k]);
+        printf("\n");
+        for (k = n - 1; k >= 0; k--)
+            printf("%c", raln[k]);
+        printf("\n\n");
+        return;
+    } */
+    if (p->W1) {    // 向上回溯一格
+        saln[n] = s[i - 1];
+        raln[n] = GAP_CHAR;
+        printAlign(a, i - 1, j, s, r, saln, raln, n + 1);
+    }
+    if (p->W2) {    // 向左上回溯一格
+        saln[n] = s[i - 1];
+        raln[n] = r[j - 1];
+        printAlign(a, i - 1, j - 1, s, r, saln, raln, n + 1);
+    }
+    if (p->W3) {    // 向左回溯一格
+        saln[n] = GAP_CHAR;
+        raln[n] = r[j - 1];
+        printAlign(a, i, j - 1, s, r, saln, raln, n + 1);
+    }
+}
+
+void align(char *s, char *r) {
+    int i, j;
+    int m = strlen(s);
+    int n = strlen(r);
+    float d = -7;     // 对第一个空位的罚分
+    float e = -2;     // 第二个及以后空位的罚分
+    pUnit **aUnit;
+    char* salign;
+    char* ralign;
+    float f;
+    // 初始化
+    if ((aUnit = (pUnit **) malloc(sizeof(pUnit*) * (m + 1))) == NULL) {
+        fputs("Error: Out of space!\n", stderr);
+        exit(1);
+    }
+    for (i = 0; i <= m; i++) {
+        if ((aUnit[i] = (pUnit *) malloc(sizeof(pUnit) * (n + 1))) == NULL) {
+            fputs("Error: Out of space!\n", stderr);
+            exit(1);     
+        }
+        for (j = 0; j <= n; j++) {
+            if ((aUnit[i][j] = (pUnit) malloc(sizeof(struct Unit))) == NULL) {
+                fputs("Error: Out of space!\n", stderr);
+                exit(1);     
+            }
+            aUnit[i][j]->W1 = 0;
+            aUnit[i][j]->W2 = 0;
+            aUnit[i][j]->W3 = 0;
+        }
+    }
+    aUnit[0][0]->X = d;
+    aUnit[0][0]->Y = d;
+    aUnit[0][0]->M = 0;
+    aUnit[0][0]->O = max3(aUnit[0][0]->X, aUnit[0][0]->Y, aUnit[0][0]->M);
+    for (i = 1; i <= m; i++) {
+        aUnit[i][0]->X = d + (i - 1) * e;
+        aUnit[i][0]->Y = 2 * d + (i - 1) * e;
+        aUnit[i][0]->M = d + (i - 1) * e;
+        aUnit[i][0]->O = max3(aUnit[i][0]->X, aUnit[i][0]->Y, aUnit[i][0]->M);
+        aUnit[i][0]->W1 = 1;
+    }
+    for (j = 1; j <= n; j++) {
+        aUnit[0][j]->X = 2 * d + (j - 1) * e;
+        aUnit[0][j]->Y = d + (j - 1) * e;
+        aUnit[0][j]->M = d + (j - 1) * e;
+        aUnit[0][j]->O = max3(aUnit[0][j]->X, aUnit[0][j]->Y, aUnit[0][j]->M);
+        aUnit[0][j]->W3 = 1;
+    }
+      // 动态规划算法计算得分矩阵每个单元的分值
+    for (i = 1; i <= m; i++) {
+        for (j = 1; j <= n; j++) {
+            aUnit[i][j]->X = max2(aUnit[i - 1][j]->X + e, aUnit[i - 1][j]->M + d);
+            aUnit[i][j]->Y = max2(aUnit[i][j - 1]->Y + e, aUnit[i][j - 1]->M + d);
+            f = getFScore(s[i - 1], r[j - 1]);
+            aUnit[i][j]->M = max3(aUnit[i - 1][j - 1]->X + f, aUnit[i - 1][j - 1]->Y + f, aUnit[i - 1][j - 1]->M + f);
+            aUnit[i][j]->O = max3(aUnit[i][j]->X, aUnit[i][j]->Y, aUnit[i][j]->M);
+            if (aUnit[i][j]->O == aUnit[i][j]->X) aUnit[i][j]->W1 = 1;
+            if (aUnit[i][j]->O == aUnit[i][j]->M) aUnit[i][j]->W2 = 1;
+            if (aUnit[i][j]->O == aUnit[i][j]->Y) aUnit[i][j]->W3 = 1;
+        }
+    }
+/*
+    // 打印得分矩阵
+    for (i = 0; i <= m; i++) {
+        for (j = 0; j <= n; j++)
+            printf("%f ", aUnit[i][j]->O);
+        printf("\n");
+    }
+*/
+    //printf("max score: %f\n", aUnit[m][n]->O);
+    // 打印最优比对结果，如果有多个，全部打印
+    // 递归法
+    if ((salign = (char*) malloc(sizeof(char) * (m + n + 1))) == NULL) {
+        fputs("Error: Out of space!\n", stderr);
+        exit(1);
+    }
+    if ((ralign = (char*) malloc(sizeof(char) * (m + n + 1))) == NULL) {
+        fputs("Error: Out of space!\n", stderr);
+        exit(1);
+    }
+    printAlign(aUnit, m, n, s, r, salign, ralign, 0);
+    // 释放内存
+    free(salign);
+    free(ralign);
+    for (i = 0; i <= m; i++) {
+        for (j = 0; j <= n; j++) {
+            free(aUnit[i][j]);
+        }
+        free(aUnit[i]);
+    }
+    free(aUnit);
+}
+
+Alg_read NW (char *seq_read_00, char *seqs, Less_max *less_max, Over_max *over_max, int lessloction, int overloction, W_yuanzu *w_yuanzu)
+{
+  
+}
 Alg_read hanming( char *seq_read_00, char *seqs, Less_max *less_max, Over_max *over_max, int lessloction, int overloction, W_yuanzu *w_yuanzu)
 {
    Alg_read alg;
    alg.min = 0;
    int l = 0;
    alg.ref_loc=0;
+   int flag_ov = 0 ;
    for(int i =0; i<=lessloction; i++)
    {
     int start = less_max[i].start;
     int end = less_max[i].end;
     char cig[100];
     int mismatch =0;
+    
     for( ; start <= end ;start++)
     {
        int alg_loc =w_yuanzu[start].Loction1;
@@ -84,33 +238,81 @@ Alg_read hanming( char *seq_read_00, char *seqs, Less_max *less_max, Over_max *o
          if (seq_read_00[j]==seqs[alg_loc])
          {
             /* code */
-            cig[j]= "=";
+            cig[j] = '=';
          }
          else
          {
-            cig[j]= "X";
+            cig[j] = 'X';
             mismatch++;
          }
          alg_loc++;
        }
-       if (min > mismatch)
+       if (alg.min > mismatch)
        {
          /* code */
-         min = mismatch;
-         memcpy(alg.cig_1,cig,sizeof(cig_1));
-         ref_loc = w_yuanzu[start].Loction1;
+         alg.min = mismatch;
+         memcpy(alg.cig_1,cig,sizeof(alg.cig_1));
+         alg.ref_loc = w_yuanzu[start].Loction1;
        }
        
     }
     l++;
-    if(g(l,min))
+    if(g(l,alg.min))
+      {
+      flag_ov = 1;
       break;
+      }
    }
-   if (min>50)
+   while (flag_ov == 0)
+   {
+      /* code */
+      for(int i =0; i<=overloction; i++)
+      {
+          int start = over_max[i].start;
+          int end = over_max[i].end;
+          char cig[100];
+          int mismatch =0;
+         for( ; start <= end ;start++)
+        {
+             int alg_loc =w_yuanzu[start].Loction1;
+             for (int j = 0; j < 100; j++)
+         {
+            /* code */
+            if (seq_read_00[j]==seqs[alg_loc])
+          {
+            /* code */
+            cig[j]= '=';
+           }
+           else
+          {
+            cig[j]= 'X';
+            mismatch++;
+         }
+           alg_loc++;
+         }
+       if (alg.min > mismatch)
+       {
+         /* code */
+         alg.min = mismatch;
+         memcpy(alg.cig_1,cig,sizeof(alg.cig_1));
+         alg.ref_loc = w_yuanzu[start].Loction1;
+       }
+       
+       }
+       l++;
+       if(g(l,alg.min))
+      {
+      break;
+      }
+     }
+     flag_ov = 1;
+   }
+   
+   if (alg.min>50)
    {
       /* code */
       //NW函数
-    return  ;
+    return  NW();
    }
    else
     return alg;
@@ -187,9 +389,12 @@ void aligner (int argc, char *argv[], long p_k_mer, P_yuanzu *p_yuanzu, W_yuanzu
             if (k_mer_order == 0)
             {
                 /* code */
-              strcpy(read_kmer[k_mer_order].k_mer_read, test_read); 
+              int number=atoi(test_read);
+              if(number % 7 == 5 || number % 17 == 7 || number % 19 == 13 || number % 53 == 31 || number % 71 == 47 )
+              {strcpy(read_kmer[k_mer_order].k_mer_read, test_read); 
               read_kmer[k_mer_order].loction_read = i_dingwei-22;
               k_mer_order++;
+              }
             }
              for (int k = 0; k < k_mer_order; k++)
              {
@@ -206,9 +411,13 @@ void aligner (int argc, char *argv[], long p_k_mer, P_yuanzu *p_yuanzu, W_yuanzu
              if (flag_read == 0)
              {
                 /* code */
+                int number=atoi(test_read);
+               if(number % 7 == 5 || number % 17 == 7 || number % 19 == 13 || number % 53 == 31 || number % 71 == 47 )
+                {
                 strcpy(read_kmer[k_mer_order].k_mer_read, test_read);
                 read_kmer[k_mer_order].loction_read = i_dingwei-22;
                 k_mer_order++;
+                }
              }
              
          }
@@ -238,13 +447,17 @@ void aligner (int argc, char *argv[], long p_k_mer, P_yuanzu *p_yuanzu, W_yuanzu
               if (flag_read == 0)
              {
                 /* code */
+               int number=atoi(test_read);
+              if(number % 7 == 5 || number % 17 == 7 || number % 19 == 13 || number % 53 == 31 || number % 71 == 47 )
+                {
                 strcpy(read_kmer[k_mer_order].k_mer_read, test_read);
                 read_kmer[k_mer_order].loction_read = kk;
                 k_mer_order++;
+                }
              }
           }
           less_max = (Less_max*)malloc(k_mer_order*sizeof(Less_max));
-          Over_max = (Over_max*)malloc(k_mer_order*sizeof(Over_max));
+          over_max = (Over_max*)malloc(k_mer_order*sizeof(Over_max));
           int lessloction = 0 ;
           int overloction = 0 ;
           for(int kmer_dingwei = 0; kmer_dingwei<k_mer_order; kmer_dingwei++)
