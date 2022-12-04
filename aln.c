@@ -12,7 +12,7 @@ typedef struct
 {
    /* data */
    int min;
-   char cig_1[100];
+   char *cig_1;
    int ref_loc;
 }Alg_read;
 
@@ -34,10 +34,10 @@ struct Unit {
     int W1;   // 是否往上回溯一格
     int W2;   // 是否往左上回溯一格
     int W3;   // 是否往左回溯一格
-    float X;
-    float Y;
-    float M;
-    float O;      // 得分矩阵第(i, j)这个单元的分值，即序列s(1,...,i)与序列r(1,...,j)比对的最高得分
+    int X;
+    int Y;
+    int M;
+    int O;      // 得分矩阵第(i, j)这个单元的分值，即序列s(1,...,i)与序列r(1,...,j)比对的最高得分
 };
 typedef struct Unit *pUnit;
 
@@ -48,16 +48,21 @@ int g(int l , int m)
     else
     return 0 ;
 }
-void rle()//游程编码
+void rle(char *cig)//游程编码
 {
  int count = 0;
  char samechar;
+ int length = sizeof(cig);
+ char *cig_rle;
+ cig_rle = (char*)malloc(length*sizeof(char));
  char temp = cig[0];
  int loction = 0;
+ int rle_lo = 0; 
  samechar = temp;
  while (loction < 100)
  {
    /* code */
+
    if (temp == samechar)
    {
       count++;
@@ -67,29 +72,32 @@ void rle()//游程编码
    }
    else
    {
-      ;
-      ;
+      cig_rle[rle_lo] = count;
+      rle_lo++;
+      cig_rle[rle_lo] = samechar;
+      rle_lo++;
       samechar = temp;
       count = 0;
    }
  }
- 
+ memset(cig,'\0',sizeof(cig));
+ strcpy(cig,cig_rle);
 }
-float max2(float a, float b) {
+int max2(int a, int b) {
     return a > b ? a : b;
 }
-float max3(float a, float b, float c) {
-    float f = a > b ? a : b;
+int max3(int a, int b, int c) {
+    int f = a > b ? a : b;
     return f > c ? f : c;
 }
 //match分值为5，mismatch分值为-4
-float getFScore(char a, char b) {
+int getFScore(char a, char b) {
     if(a == b)
     return 5 ;
     else
     return -4;
 }
-void printAlign(pUnit** a, const int i, const int j, char* s, char* r, char* saln, char* raln, int n) {
+void printAlign(pUnit** a, const int i, const int j, char* s, char* r, char* saln, char* raln, int n, char *cig_n) {
    // int k;
     pUnit p = a[i][j];
 /*     if (! (i || j)) {   // 到矩阵单元(0, 0)才算结束，这代表初始的两个字符串的每个字符都被比对到了
@@ -104,30 +112,33 @@ void printAlign(pUnit** a, const int i, const int j, char* s, char* r, char* sal
     if (p->W1) {    // 向上回溯一格
         saln[n] = s[i - 1];
         raln[n] = GAP_CHAR;
-        printAlign(a, i - 1, j, s, r, saln, raln, n + 1);
+        cig_n[n] = 'I';
+        printAlign(a, i - 1, j, s, r, saln, raln, n + 1, cig_n);
     }
     if (p->W2) {    // 向左上回溯一格
         saln[n] = s[i - 1];
         raln[n] = r[j - 1];
-        printAlign(a, i - 1, j - 1, s, r, saln, raln, n + 1);
+        cig_n[n] = 'M';
+        printAlign(a, i - 1, j - 1, s, r, saln, raln, n + 1, cig_n);
     }
     if (p->W3) {    // 向左回溯一格
         saln[n] = GAP_CHAR;
         raln[n] = r[j - 1];
-        printAlign(a, i, j - 1, s, r, saln, raln, n + 1);
+        cig_n[n] = 'D';
+        printAlign(a, i, j - 1, s, r, saln, raln, n + 1, cig_n);
     }
 }
 
-void align(char *s, char *r) {
+void align(char *s, char *r, int *max, char *cig_n) {
     int i, j;
     int m = strlen(s);
     int n = strlen(r);
-    float d = -7;     // 对第一个空位的罚分
-    float e = -2;     // 第二个及以后空位的罚分
+    int d = -7;     // 对第一个空位的罚分
+    int e = -2;     // 第二个及以后空位的罚分
     pUnit **aUnit;
     char* salign;
     char* ralign;
-    float f;
+    int f;
     // 初始化
     if ((aUnit = (pUnit **) malloc(sizeof(pUnit*) * (m + 1))) == NULL) {
         fputs("Error: Out of space!\n", stderr);
@@ -179,17 +190,18 @@ void align(char *s, char *r) {
             if (aUnit[i][j]->O == aUnit[i][j]->Y) aUnit[i][j]->W3 = 1;
         }
     }
-/*
+ /*
     // 打印得分矩阵
     for (i = 0; i <= m; i++) {
         for (j = 0; j <= n; j++)
             printf("%f ", aUnit[i][j]->O);
         printf("\n");
     }
-*/
+ */
     //printf("max score: %f\n", aUnit[m][n]->O);
     // 打印最优比对结果，如果有多个，全部打印
     // 递归法
+    max[0] = aUnit[m][n]->O;
     if ((salign = (char*) malloc(sizeof(char) * (m + n + 1))) == NULL) {
         fputs("Error: Out of space!\n", stderr);
         exit(1);
@@ -198,7 +210,9 @@ void align(char *s, char *r) {
         fputs("Error: Out of space!\n", stderr);
         exit(1);
     }
-    printAlign(aUnit, m, n, s, r, salign, ralign, 0);
+    cig_n = (char*) malloc(sizeof(char) * (m + n + 1));
+    printAlign(aUnit, m, n, s, r, salign, ralign, 0, cig_n);
+
     // 释放内存
     free(salign);
     free(ralign);
@@ -209,19 +223,83 @@ void align(char *s, char *r) {
         free(aUnit[i]);
     }
     free(aUnit);
+     
 }
 
-Alg_read NW (char *seq_read_00, char *seqs, Less_max *less_max, Over_max *over_max, int lessloction, int overloction, W_yuanzu *w_yuanzu)
+Alg_read NW (char *seq_read_00, char *seqs, Less_max *less_max, Over_max *over_max, int lessloction, int overloction, W_yuanzu *w_yuanzu, long bases)
 {
   
+  char *r;
+  char *cig_n;
+  Alg_read alg;
+   alg.min = 0;
+   int l = 0;
+   alg.ref_loc=0;
+   int flag_ov = 0 ;
+   int max_1 = 0;
+   int max[1];
+   for(int i =0; i<=lessloction; i++)
+   {
+    int start = less_max[i].start;
+    int end = less_max[i].end;
+     for( ; start <= end ;start++)
+     {
+          int alg_loc =w_yuanzu[start].Loction1;
+          int length = bases - alg_loc;
+          r =(char *)malloc(length*sizeof(char));
+          long j = 0;
+          for(long i = alg_loc; i<bases; i++)
+          {
+               r[j] = seqs[alg_loc];
+               j++;
+          }
+          align(r, seq_read_00, max, cig_n);
+          if(max_1< max[0])
+          {
+            max_1 = max[0];
+            rle(cig_n);
+            alg.ref_loc = alg_loc;
+            alg.cig_1 = cig_n;
+          }
+     }
+
+   }
+   for(int i =0; i<=overloction; i++)
+   {
+     int start = over_max[i].start;
+     int end = over_max[i].end;
+     for( ; start <= end ;start++)
+     {
+          int alg_loc =w_yuanzu[start].Loction1;
+          int length = bases - alg_loc;
+          r =(char *)malloc(length*sizeof(char));
+          long j = 0;
+          for(long i = alg_loc; i<bases; i++)
+          {
+               r[j] = seqs[alg_loc];
+               j++;
+          }
+          align(r, seq_read_00, max, cig_n);
+          if(max_1< max[0])
+          {
+            max_1 = max[0];
+            rle(cig_n);
+            alg.ref_loc = alg_loc;
+            alg.cig_1 = cig_n;
+          }
+     }
+   }
+   return alg;
 }
-Alg_read hanming( char *seq_read_00, char *seqs, Less_max *less_max, Over_max *over_max, int lessloction, int overloction, W_yuanzu *w_yuanzu)
+Alg_read hanming( char *seq_read_00, char *seqs, Less_max *less_max, Over_max *over_max, int lessloction, int overloction, W_yuanzu *w_yuanzu, long bases)
 {
    Alg_read alg;
    alg.min = 0;
    int l = 0;
    alg.ref_loc=0;
    int flag_ov = 0 ;
+   long base = bases;
+   alg.cig_1 = (char *)malloc(100*sizeof(char));
    for(int i =0; i<=lessloction; i++)
    {
     int start = less_max[i].start;
@@ -251,6 +329,7 @@ Alg_read hanming( char *seq_read_00, char *seqs, Less_max *less_max, Over_max *o
        {
          /* code */
          alg.min = mismatch;
+         rle(cig);
          memcpy(alg.cig_1,cig,sizeof(alg.cig_1));
          alg.ref_loc = w_yuanzu[start].Loction1;
        }
@@ -294,7 +373,8 @@ Alg_read hanming( char *seq_read_00, char *seqs, Less_max *less_max, Over_max *o
        {
          /* code */
          alg.min = mismatch;
-         memcpy(alg.cig_1,cig,sizeof(alg.cig_1));
+         rle(cig);
+         
          alg.ref_loc = w_yuanzu[start].Loction1;
        }
        
@@ -312,7 +392,7 @@ Alg_read hanming( char *seq_read_00, char *seqs, Less_max *less_max, Over_max *o
    {
       /* code */
       //NW函数
-    return  NW();
+    return  NW(seq_read_00, seqs, less_max, over_max, lessloction, overloction, w_yuanzu, base);
    }
    else
     return alg;
@@ -356,7 +436,10 @@ void aligner (int argc, char *argv[], long p_k_mer, P_yuanzu *p_yuanzu, W_yuanzu
       char seq_read_00 [100];
       Less_max *less_max;
       Over_max *over_max;
+      int lessloction = 0 ;
+      int overloction = 0 ;
       char *cigar;
+      Alg_read alg;
       for (int seq_swich = 0; seq_swich < 100; seq_swich++)
       {
         /* code */
@@ -458,8 +541,7 @@ void aligner (int argc, char *argv[], long p_k_mer, P_yuanzu *p_yuanzu, W_yuanzu
           }
           less_max = (Less_max*)malloc(k_mer_order*sizeof(Less_max));
           over_max = (Over_max*)malloc(k_mer_order*sizeof(Over_max));
-          int lessloction = 0 ;
-          int overloction = 0 ;
+
           for(int kmer_dingwei = 0; kmer_dingwei<k_mer_order; kmer_dingwei++)
           {         
              
@@ -485,10 +567,18 @@ void aligner (int argc, char *argv[], long p_k_mer, P_yuanzu *p_yuanzu, W_yuanzu
             }
 
           }
-
-         
-      
-      
+       alg = hanming(seq_read_00, seqs, less_max, over_max, lessloction, overloction, w_yuanzu, length);
+       fprintf(fp_sam, "%c\t", '*');
+       fprintf(fp_sam, "%c\t", '*');
+       fprintf(fp_sam, "%d\t", alg.ref_loc);
+       fprintf(fp_sam, "%c\t", '*');
+       fprintf(fp_sam, "%s\t", alg.cig_1);
+       fprintf(fp_sam, "%c\t", '*');
+       fprintf(fp_sam, "%c\t", '*');  
+       fprintf(fp_sam, "%c\t", '*');
+       fprintf(fp_sam, "%c\t", '*'); 
+       fprintf(fp_sam, "%s\t", seq_read_seq); 
+       fprintf(fp_sam, "%c\n", '*'); 
 
     }
     fclose(fp_sam);
